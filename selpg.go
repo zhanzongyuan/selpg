@@ -45,22 +45,35 @@ func init() {
 func processStream(in io.Reader) error {
 	pageIter, flagIter := 1, 0
 
-	buffer := make([]byte, 1)
-	_, err := in.Read(buffer)
+	buffer := make([]byte, 16)
+	n, err := in.Read(buffer)
 	for err == nil {
-		if pageIter >= *startPage && pageIter <= *endPage {
-			fmt.Fprintf(os.Stdout, "%s", string(buffer))
-		}
+		accStart, accEnd := 0, n
 
-		if pageendFlag == buffer[0] {
-			flagIter = (flagIter + 1) % limitFlag
+		for i := 0; i < n; i++ {
+			// count iterator
+			if pageendFlag == buffer[i] {
 
-			if flagIter == 0 {
-				pageIter++
+				flagIter = (flagIter + 1) % limitFlag
+				// next page
+				if flagIter == 0 {
+					pageIter++
+					if pageIter == *startPage {
+						accStart = i + 1
+					} else if pageIter == *endPage+1 {
+						accEnd = i + 1
+					}
+				}
 			}
 		}
 
-		_, err = in.Read(buffer)
+		if pageIter >= *startPage {
+			fmt.Fprintf(os.Stdout, "%s", string(buffer[accStart:accEnd]))
+		}
+		if pageIter > *endPage {
+			break
+		}
+		n, err = in.Read(buffer)
 	}
 	return nil
 }
