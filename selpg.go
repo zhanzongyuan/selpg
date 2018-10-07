@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 
@@ -45,7 +43,7 @@ func init() {
 }
 
 // utils
-func processStream(in io.Reader, out io.Writer, q chan int) error {
+func processStream(in io.Reader, out io.Writer) error {
 	// process input stream
 	pageIter, flagIter := 1, 0
 	buffer := make([]byte, 16)
@@ -61,6 +59,8 @@ func processStream(in io.Reader, out io.Writer, q chan int) error {
 				// next page
 				if flagIter == 0 {
 					pageIter++
+
+					// find output interval in byte buffer.
 					if pageIter == *startPage {
 						accStart = i + 1
 					} else if pageIter == *endPage+1 {
@@ -78,16 +78,26 @@ func processStream(in io.Reader, out io.Writer, q chan int) error {
 		}
 		n, err = in.Read(buffer)
 	}
-	if *destination != "" {
-		q <- exitCode
-	}
 	return nil
 }
 
-/*
-func printer() {
+// printer goroutine
+func runPrinter(reader io.Reader, quit chan int) {
+	cmd := exec.Command("lp", "-d", *destination)
+	cmd.Stdin = reader
 
-}*/
+	// TODO: use Run() replace CombinedOutput() and split stdout and stderr output.
+	stdoutStderr, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, string(stdoutStderr))
+		exitCode = 2
+		reportErr(err)
+		quit <- 0
+		return
+	}
+	fmt.Fprintln(os.Stdout, string(stdoutStderr))
+	quit <- 0
+}
 
 func reportErr(err error) {
 	fmt.Fprintln(os.Stderr, "[Error]:", err)
@@ -109,71 +119,43 @@ func selpgMain() {
 		pageendFlag = byte('\f')
 	}
 
-	// make output io
-	var out io.ReadWriter
-	q := make(chan int)
+	// switch output writer to (os.Stdout | lp -d)
+	var out io.Writer
+	quit := make(chan int)
 	if *destination == "" {
 		out = os.Stdout
 	} else {
 		// create lp printer to the destination
-		out = new(bytes.Buffer)
-		go func() {
-			cmd := exec.Command("lp", "-d", *destination)
-			cmd.Stdin = out
-			quitCode := <-q
-			if quitCode != 0 {
-				return
-			}
-			stdoutStderr, err := cmd.CombinedOutput()
-			if err != nil {
-				fmt.Println(string(stdoutStderr))
-				exitCode = 2
-				q <- exitCode
-				log.Fatal(err)
-			}
-			fmt.Println(string(stdoutStderr))
-			q <- 0
+		reader, writer := io.Pipe()
+		out = writer
+		go runPrinter(reader, quit)
+		defer func() {
+			writer.Close()
+			<-quit
 		}()
-
 	}
 
-	// TODO: process input from stdin
+	// process input from stdin
 	if flag.NArg() == 0 {
-		if err := processStream(os.Stdin, out, q); err != nil {
+		if err := processStream(os.Stdin, out); err != nil {
 			reportErr(err)
 			exitCode = 2
-		}
-		if *destination != "" {
-			q <- exitCode
 		}
 		return
 	}
 
-	// TODO: process input file from file name
+	// process input file from file name
 	path := flag.Arg(0)
-
-	// check that file is valid
 	f, err := os.Open(path)
 	defer f.Close()
 	if _, err2 := f.Stat(); err2 != nil || err != nil {
 		reportErr(err)
 		exitCode = 2
-		if *destination != "" {
-			q <- exitCode
-		}
 		return
 	}
-
-	if err := processStream(f, out, q); err != nil {
+	if err := processStream(f, out); err != nil {
 		reportErr(err)
 		exitCode = 2
-		if *destination != "" {
-			q <- exitCode
-		}
 		return
-	}
-
-	if *destination != "" {
-		<-q
 	}
 }
