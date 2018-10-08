@@ -83,20 +83,48 @@ func processStream(in io.Reader, out io.Writer) error {
 
 // printer goroutine
 func runPrinter(reader io.Reader, quit chan int) {
+	defer func() {
+		quit <- 0
+	}()
 	cmd := exec.Command("lp", "-d", *destination)
 	cmd.Stdin = reader
 
-	// TODO: use Run() replace CombinedOutput() and split stdout and stderr output.
-	stdoutStderr, err := cmd.CombinedOutput()
+	// create command standard output and input output reader
+	stdoutReader, err := cmd.StdoutPipe()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, string(stdoutStderr))
 		exitCode = 2
 		reportErr(err)
-		quit <- 0
 		return
 	}
-	fmt.Fprintln(os.Stdout, string(stdoutStderr))
-	quit <- 0
+	stderrReader, err := cmd.StderrPipe()
+	if err != nil {
+		exitCode = 2
+		reportErr(err)
+		return
+	}
+
+	// start command and wait
+	if err := cmd.Start(); err != nil {
+		exitCode = 2
+		reportErr(err)
+		return
+	}
+	if _, err := io.Copy(os.Stdout, stdoutReader); err != nil {
+		exitCode = 2
+		reportErr(err)
+		return
+	}
+	if _, err := io.Copy(os.Stderr, stderrReader); err != nil {
+		exitCode = 2
+		reportErr(err)
+		return
+	}
+	if err := cmd.Wait(); err != nil {
+		exitCode = 2
+		reportErr(err)
+		return
+	}
+
 }
 
 func reportErr(err error) {
@@ -111,7 +139,7 @@ func main() {
 }
 
 func selpgMain() {
-	// TODO: check flag correction
+	// check flag correction
 	flag.Parse()
 	limitFlag = *limitLine
 	if *pagebreakFlag {
