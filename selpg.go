@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,8 +13,8 @@ import (
 // some args
 var (
 	// mandatory options
-	startPage = flag.IntP("start", "s", 1, "Page number of the file where you want to print start from.")
-	endPage   = flag.IntP("end", "e", 1, "Page number of the file where you want to print end to.")
+	startPage = flag.IntP("start", "s", 1, "Page number of the file where you want to print start from. (must be positive)")
+	endPage   = flag.IntP("end", "e", 1, "Page number of the file where you want to print end to. (must be positive)")
 
 	// optional options
 	limitLine     = flag.IntP("limit", "l", 72, "Line number for one page.")
@@ -40,6 +41,13 @@ func usage() {
 func init() {
 	flag.CommandLine.SortFlags = false
 	flag.Usage = usage
+	/*
+		flag.CommandLine.MarkDeprecated("start", "This flag has been deprecated")
+		flag.CommandLine.MarkDeprecated("end", "This flag has been deprecated")
+		flag.CommandLine.MarkDeprecated("limit", "This flag has been deprecated")
+		flag.CommandLine.MarkDeprecated("pbflag", "This flag has been deprecated")
+		flag.CommandLine.MarkDeprecated("destination", "This flag has been deprecated")
+	*/
 }
 
 // utils
@@ -141,6 +149,26 @@ func main() {
 func selpgMain() {
 	// check flag correction
 	flag.Parse()
+	shortFlag := make(map[string]int)
+	flag.Visit(func(f *flag.Flag) {
+		shortFlag[f.Shorthand] = 1
+	})
+
+	if shortFlag["l"] == 1 && shortFlag["f"] == 1 {
+		exitCode = 2
+		reportErr(errors.New("Arguments -l and -f can not be set at the same time!"))
+		return
+	}
+	if shortFlag["e"] == 0 || shortFlag["s"] == 0 {
+		exitCode = 2
+		reportErr(errors.New("Arguments -s and -e is needed!"))
+		return
+	} else if *startPage <= 0 || *endPage <= 0 || *startPage > *endPage {
+		exitCode = 2
+		reportErr(errors.New("Arguments -s and -e must be positive, and argument -e must be equal or greater than -s"))
+		return
+	}
+
 	limitFlag = *limitLine
 	if *pagebreakFlag {
 		limitFlag = 1
