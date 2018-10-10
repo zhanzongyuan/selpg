@@ -54,7 +54,7 @@ func init() {
 // utils
 func processStream(in io.Reader, out io.Writer) error {
 	// process input stream
-	pageIter, flagIter := 1, 0
+	pageIter, flagIter, writedFlag := 1, 0, false
 
 	// deal page with flag '\f'
 	buffer := make([]byte, 16)
@@ -82,6 +82,7 @@ func processStream(in io.Reader, out io.Writer) error {
 		}
 
 		if pageIter >= *startPage {
+			writedFlag = true
 			io.WriteString(out, string(buffer[accStart:accEnd]))
 		}
 		if pageIter > *endPage {
@@ -109,7 +110,11 @@ func processStream(in io.Reader, out io.Writer) error {
 			return err
 		}
 	*/
-	return nil
+	if writedFlag {
+		return nil
+	} else {
+		return errors.New("usage: page number out of file range or input stream is empty.")
+	}
 }
 
 // printer goroutine
@@ -173,14 +178,14 @@ func selpgMain() {
 	})
 
 	if shortFlag["l"] == 1 && shortFlag["f"] == 1 {
-		reportErr(errors.New("Arguments -l and -f can not be set at the same time!"))
+		reportErr(errors.New("usage: arguments -l and -f can not be set at the same time!"))
 		return
 	}
 	if shortFlag["e"] == 0 || shortFlag["s"] == 0 {
-		reportErr(errors.New("Arguments -s and -e is needed!"))
+		reportErr(errors.New("usage: rguments -s and -e is needed!"))
 		return
 	} else if *startPage <= 0 || *endPage <= 0 || *startPage > *endPage {
-		reportErr(errors.New("Arguments -s and -e must be positive, and argument -e must be equal or greater than -s"))
+		reportErr(errors.New("usage: rguments -s and -e must be positive, and argument -e must be equal or greater than -s"))
 		return
 	}
 
@@ -215,13 +220,12 @@ func selpgMain() {
 			log.Fatal(err)
 		}
 		if (stat.Mode() & os.ModeCharDevice) != 0 {
-			reportErr(errors.New("Invalid standard input!"))
+			reportErr(errors.New("usage: invalid standard input!"))
 			return
 		}
 		// process stdin stream
 		if err := processStream(os.Stdin, out); err != nil {
-			exitCode = 2
-			log.Fatal(err)
+			reportErr(err)
 		}
 		return
 	}
@@ -235,8 +239,7 @@ func selpgMain() {
 		return
 	}
 	if err := processStream(f, out); err != nil {
-		exitCode = 2
-		log.Fatal(err)
+		reportErr(err)
 		return
 	}
 }
