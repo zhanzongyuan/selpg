@@ -149,7 +149,6 @@ func runPrinter(reader io.Reader, quit chan int) {
 		exitCode = 2
 		log.Fatal(err)
 	}
-
 }
 
 func reportErr(err error) {
@@ -209,6 +208,17 @@ func selpgMain() {
 
 	// process input from stdin
 	if flag.NArg() == 0 {
+		// check stdin input mode, do not accept ModeCharDevice mode
+		stat, err := os.Stdin.Stat()
+		if err != nil {
+			exitCode = 2
+			log.Fatal(err)
+		}
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			reportErr(errors.New("Invalid standard input!"))
+			return
+		}
+		// process stdin stream
 		if err := processStream(os.Stdin, out); err != nil {
 			exitCode = 2
 			log.Fatal(err)
