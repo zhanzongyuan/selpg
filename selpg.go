@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 
@@ -53,9 +54,12 @@ func init() {
 // utils
 func processStream(in io.Reader, out io.Writer) error {
 	// process input stream
-	pageIter, flagIter := 1, 0
+	pageIter, flagIter, writedFlag := 1, 0, false
+
+	// deal page with flag '\f'
 	buffer := make([]byte, 16)
 	n, err := in.Read(buffer)
+
 	for err == nil {
 		accStart, accEnd := 0, n
 
@@ -67,7 +71,6 @@ func processStream(in io.Reader, out io.Writer) error {
 				// next page
 				if flagIter == 0 {
 					pageIter++
-
 					// find output interval in byte buffer.
 					if pageIter == *startPage {
 						accStart = i + 1
@@ -79,6 +82,7 @@ func processStream(in io.Reader, out io.Writer) error {
 		}
 
 		if pageIter >= *startPage {
+			writedFlag = true
 			io.WriteString(out, string(buffer[accStart:accEnd]))
 		}
 		if pageIter > *endPage {
@@ -86,57 +90,75 @@ func processStream(in io.Reader, out io.Writer) error {
 		}
 		n, err = in.Read(buffer)
 	}
-	return nil
+	/*
+		scanner := bufio.NewScanner(in)
+		for scanner.Scan() {
+			if pageIter >= *startPage && pageIter <= *endPage {
+				if pageIter != *startPage && flagIter == 0 {
+					io.WriteString(out, "\f")
+				}
+				io.WriteString(out, scanner.Text())
+			} else if pageIter > *endPage {
+				break
+			}
+			flagIter = (flagIter + 1) % limitFlag
+			if flagIter == 0 {
+				pageIter++
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+	*/
+	if writedFlag {
+		return nil
+	} else {
+		return errors.New("usage: page number out of file range or input stream is empty.")
+	}
 }
 
 // printer goroutine
-func runPrinter(reader io.Reader, quit chan int) {
-	defer func() {
-		quit <- 0
-	}()
+func runPrinter(reader io.Reader, quit chan error) {
 	cmd := exec.Command("lp", "-d", *destination)
 	cmd.Stdin = reader
 
 	// create command standard output and input output reader
 	stdoutReader, err := cmd.StdoutPipe()
 	if err != nil {
-		exitCode = 2
-		reportErr(err)
+		quit <- err
 		return
 	}
+
 	stderrReader, err := cmd.StderrPipe()
 	if err != nil {
-		exitCode = 2
-		reportErr(err)
+		quit <- err
 		return
 	}
 
 	// start command and wait
 	if err := cmd.Start(); err != nil {
-		exitCode = 2
-		reportErr(err)
+		quit <- err
 		return
 	}
 	if _, err := io.Copy(os.Stdout, stdoutReader); err != nil {
-		exitCode = 2
-		reportErr(err)
+		quit <- err
 		return
 	}
 	if _, err := io.Copy(os.Stderr, stderrReader); err != nil {
-		exitCode = 2
-		reportErr(err)
+		quit <- err
 		return
 	}
 	if err := cmd.Wait(); err != nil {
-		exitCode = 2
-		reportErr(err)
+		quit <- err
 		return
 	}
-
+	quit <- nil
 }
 
 func reportErr(err error) {
-	fmt.Fprintln(os.Stderr, "[Error]:", err)
+	exitCode = 2
+	fmt.Fprintln(os.Stderr, err)
+	usage()
 }
 
 // main process
@@ -155,17 +177,14 @@ func selpgMain() {
 	})
 
 	if shortFlag["l"] == 1 && shortFlag["f"] == 1 {
-		exitCode = 2
-		reportErr(errors.New("Arguments -l and -f can not be set at the same time!"))
+		reportErr(errors.New("usage: arguments -l and -f can not be set at the same time!"))
 		return
 	}
 	if shortFlag["e"] == 0 || shortFlag["s"] == 0 {
-		exitCode = 2
-		reportErr(errors.New("Arguments -s and -e is needed!"))
+		reportErr(errors.New("usage: rguments -s and -e is needed!"))
 		return
 	} else if *startPage <= 0 || *endPage <= 0 || *startPage > *endPage {
-		exitCode = 2
-		reportErr(errors.New("Arguments -s and -e must be positive, and argument -e must be equal or greater than -s"))
+		reportErr(errors.New("usage: rguments -s and -e must be positive, and argument -e must be equal or greater than -s"))
 		return
 	}
 
@@ -177,7 +196,7 @@ func selpgMain() {
 
 	// switch output writer to (os.Stdout | lp -d)
 	var out io.Writer
-	quit := make(chan int)
+	quit := make(chan error)
 	if *destination == "" {
 		out = os.Stdout
 	} else {
@@ -187,15 +206,28 @@ func selpgMain() {
 		go runPrinter(reader, quit)
 		defer func() {
 			writer.Close()
-			<-quit
+			if err := <-quit; err != nil {
+				exitCode = 2
+				log.Fatal(err)
+			}
 		}()
 	}
 
 	// process input from stdin
 	if flag.NArg() == 0 {
+		// check stdin input mode, do not accept ModeCharDevice mode
+		stat, err := os.Stdin.Stat()
+		if err != nil {
+			exitCode = 2
+			log.Fatal(err)
+		}
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			reportErr(errors.New("usage: invalid standard input!"))
+			return
+		}
+		// process stdin stream
 		if err := processStream(os.Stdin, out); err != nil {
 			reportErr(err)
-			exitCode = 2
 		}
 		return
 	}
@@ -206,12 +238,10 @@ func selpgMain() {
 	defer f.Close()
 	if _, err2 := f.Stat(); err2 != nil || err != nil {
 		reportErr(err)
-		exitCode = 2
 		return
 	}
 	if err := processStream(f, out); err != nil {
 		reportErr(err)
-		exitCode = 2
 		return
 	}
 }
