@@ -79,6 +79,8 @@ selpg -s1 -e1 -dPDF input_file
 
 ## Design
 
+> [My design blog](http://blog.zhanzy.xyz/2018/10/04/Go%E5%BC%80%E5%8F%91CLI%E5%AE%9E%E7%94%A8%E7%A8%8B%E5%BA%8F%E5%88%9D%E4%BD%93%E9%AA%8C/#%E8%AE%BE%E8%AE%A1selpg%E7%A8%8B%E5%BA%8F%E7%BB%93%E6%9E%84)
+
 `processStream(io.Reader, io.Writer) error` : This function processes the input stream with interface `io.Reader`, and will write them to output interface `io.Writer`.
 
 `runPrinter(io.Reader, chan error)` : This function will execute `lp -d` command in a goroutine, so we can print output to a printer in the system. We design a reader-writer pipe to connect its input with `processStream` output synchronously. Also `chan error` can help printer goroutine quit synchronously and report error to main thread.
