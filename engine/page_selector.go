@@ -13,7 +13,7 @@ type SelectOptions struct {
 }
 
 // utils
-func SelectPage(in io.Reader, out io.Writer, opts *SelectOptions) error {
+func SelectPages(in io.Reader, out io.Writer, opts *SelectOptions) error {
 	// process input stream
 	pageIter, flagIter, writedFlag := 1, 0, false
 

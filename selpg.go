@@ -118,7 +118,7 @@ func selpgMain() {
 			return
 		}
 		// process stdin stream and select page
-		if err := engine.SelectPage(os.Stdin, out, &selpgOpts); err != nil {
+		if err := engine.SelectPages(os.Stdin, out, &selpgOpts); err != nil {
 			reportErr(err)
 		}
 		return
@@ -132,7 +132,7 @@ func selpgMain() {
 		reportErr(err)
 		return
 	}
-	if err := engine.SelectPage(f, out, &selpgOpts); err != nil {
+	if err := engine.SelectPages(f, out, &selpgOpts); err != nil {
 		reportErr(err)
 		return
 	}
