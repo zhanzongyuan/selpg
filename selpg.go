@@ -14,8 +14,8 @@ import (
 // some args
 var (
 	// mandatory options
-	startPage = flag.IntP("start", "s", 1, "Page number of the file where you want to print start from. (must be positive)")
-	endPage   = flag.IntP("end", "e", 1, "Page number of the file where you want to print end to. (must be positive)")
+	startPage = flag.IntP("start", "s", 0, "Page number of the file where you want to print start from. (must be positive)")
+	endPage   = flag.IntP("end", "e", 0, "Page number of the file where you want to print end to. (must be positive)")
 
 	// optional options
 	limitLine     = flag.IntP("limit", "l", 72, "Line number for one page.")
@@ -34,7 +34,7 @@ var (
 )
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: selpg [OPTION...] [FILE]...")
+	fmt.Fprintln(os.Stderr, "Usage: selpg -s <start-page> -e <end-page> [option...] -- <file_path>")
 	flag.PrintDefaults()
 }
 
