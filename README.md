@@ -4,13 +4,23 @@
 
 ## Install
 
-[Go environment](https://golang.org/doc/install) is required!
+[Go installation](https://golang.org/doc/install) required!
+
+After installing go and setting workspace, try:
 
 ```shell
-go get github.com/zhanzongyuan/selpg
+go get -u github.com/zhanzongyuan/selpg
 ```
 
+Then, check if install the command:
 
+```shell
+selpg -h
+```
+
+If you see the help information, then you can use the `selpg` to print you file as you want!
+
+<br>
 
 ## Usage
 
@@ -32,9 +42,40 @@ selpg -s [start_page] -e [end_page] [option...] -- [path]
 
 `-d, --destination string`: Printer destination to print choesn page.
 
-**Example**:
+**Examples**:
 
+1. Print the first page on screen
 
+```shell
+selpg -s1 -e1 input_file
+# or input from redirect
+selpg -s1 -e1 < input_file
+# or input from pipe
+other_command | selpg -s1 -e1
+```
+
+2. Print the first page with 66 lines limit
+
+```shell
+selpg -s1 -e1 -l66 input_file # every page of file will be limited to 66 lines
+```
+
+3. Print the first page by page break`'\f'`
+
+```shell
+# notice: '-f' flag and '-l' flag shouldn't be set at the same time
+# set '-f' flag mean every page will end by '\f'.
+selpg -s1 -e1 -f input_file
+```
+
+4. Print the first page to printer with destination. You can use [cups-pdf](http://terokarvinen.com/2011/print-pdf-from-command-line-cups-pdf-lpr-p-pdf) to install command line pdf printer to try this flag.
+
+```shell
+# Print the first page to PDF printer (install cups-pdf first)
+selpg -s1 -e1 -dPDF input_file 
+```
+
+<br>
 
 ## Design
 
