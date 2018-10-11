@@ -22,21 +22,15 @@ selpg -s [start_page] -e [end_page] [option...] -- [path]
 
 **Options**:
 
-`-s, --start int `:
+`-s, --start int `: Page number of the file where you want to print start from (must be positive).
 
-​	Page number of the file where you want to print start from (must be positive).
-`-e, --end int`:
+`-e, --end int`: Page number of the file where you want to print end to (must be positive).
 
-​	Page number of the file where you want to print end to (must be positive).
-`-l, --limit int`:
+`-l, --limit int`: Line number for one page. (default 72)
 
-​	Line number for one page. (default 72)
-`-f, --pbflag`:
+`-f, --pbflag`: Flag to find page break or not.
 
-​	Flag to find page break or not.
-`-d, --destination string`:
-
-​	Printer destination to print choesn page.
+`-d, --destination string`: Printer destination to print choesn page.
 
 **Example**:
 
