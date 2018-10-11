@@ -6,9 +6,10 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 
 	flag "github.com/spf13/pflag"
+	"github.com/zhanzongyuan/selpg/engine"
+	"github.com/zhanzongyuan/selpg/printer"
 )
 
 // some args
@@ -21,11 +22,6 @@ var (
 	limitLine     = flag.IntP("limit", "l", 72, "Line number for one page.")
 	pagebreakFlag = flag.BoolP("pbflag", "f", false, "Flag to find page break or not.")
 	destination   = flag.StringP("destination", "d", "", "Printer destination to print choesn page.")
-)
-
-var (
-	pageendFlag = byte('\n')
-	limitFlag   = 72
 )
 
 // system variable
@@ -42,117 +38,6 @@ func usage() {
 func init() {
 	flag.CommandLine.SortFlags = false
 	flag.Usage = usage
-	/*
-		flag.CommandLine.MarkDeprecated("start", "This flag has been deprecated")
-		flag.CommandLine.MarkDeprecated("end", "This flag has been deprecated")
-		flag.CommandLine.MarkDeprecated("limit", "This flag has been deprecated")
-		flag.CommandLine.MarkDeprecated("pbflag", "This flag has been deprecated")
-		flag.CommandLine.MarkDeprecated("destination", "This flag has been deprecated")
-	*/
-}
-
-// utils
-func processStream(in io.Reader, out io.Writer) error {
-	// process input stream
-	pageIter, flagIter, writedFlag := 1, 0, false
-
-	// deal page with flag '\f'
-	buffer := make([]byte, 16)
-	n, err := in.Read(buffer)
-
-	for err == nil {
-		accStart, accEnd := 0, n
-
-		for i := 0; i < n; i++ {
-			// count iterator
-			if pageendFlag == buffer[i] {
-
-				flagIter = (flagIter + 1) % limitFlag
-				// next page
-				if flagIter == 0 {
-					pageIter++
-					// find output interval in byte buffer.
-					if pageIter == *startPage {
-						accStart = i + 1
-					} else if pageIter == *endPage+1 {
-						accEnd = i + 1
-					}
-				}
-			}
-		}
-
-		if pageIter >= *startPage {
-			writedFlag = true
-			io.WriteString(out, string(buffer[accStart:accEnd]))
-		}
-		if pageIter > *endPage {
-			break
-		}
-		n, err = in.Read(buffer)
-	}
-	/*
-		scanner := bufio.NewScanner(in)
-		for scanner.Scan() {
-			if pageIter >= *startPage && pageIter <= *endPage {
-				if pageIter != *startPage && flagIter == 0 {
-					io.WriteString(out, "\f")
-				}
-				io.WriteString(out, scanner.Text())
-			} else if pageIter > *endPage {
-				break
-			}
-			flagIter = (flagIter + 1) % limitFlag
-			if flagIter == 0 {
-				pageIter++
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			return err
-		}
-	*/
-	if writedFlag {
-		return nil
-	} else {
-		return errors.New("usage: page number out of file range or input stream is empty.")
-	}
-}
-
-// printer goroutine
-func runPrinter(reader io.Reader, quit chan error) {
-	cmd := exec.Command("lp", "-d", *destination)
-	cmd.Stdin = reader
-
-	// create command standard output and input output reader
-	stdoutReader, err := cmd.StdoutPipe()
-	if err != nil {
-		quit <- err
-		return
-	}
-
-	stderrReader, err := cmd.StderrPipe()
-	if err != nil {
-		quit <- err
-		return
-	}
-
-	// start command and wait
-	if err := cmd.Start(); err != nil {
-		quit <- err
-		return
-	}
-	if _, err := io.Copy(os.Stdout, stdoutReader); err != nil {
-		quit <- err
-		return
-	}
-	if _, err := io.Copy(os.Stderr, stderrReader); err != nil {
-		quit <- err
-		return
-	}
-	if err := cmd.Wait(); err != nil {
-		quit <- err
-		return
-	}
-	quit <- nil
 }
 
 func reportErr(err error) {
@@ -188,10 +73,17 @@ func selpgMain() {
 		return
 	}
 
-	limitFlag = *limitLine
+	// create selpg options
+	selpgOpts := engine.SelectOptions{
+		*startPage,
+		*endPage,
+		'\n',
+		72,
+	}
+	selpgOpts.FlagLimit = *limitLine
 	if *pagebreakFlag {
-		limitFlag = 1
-		pageendFlag = byte('\f')
+		selpgOpts.FlagLimit = 1
+		selpgOpts.EndFlag = byte('\f')
 	}
 
 	// switch output writer to (os.Stdout | lp -d)
@@ -203,7 +95,7 @@ func selpgMain() {
 		// create lp printer to the destination
 		reader, writer := io.Pipe()
 		out = writer
-		go runPrinter(reader, quit)
+		go printer.RunPrinter(destination, reader, quit)
 		defer func() {
 			writer.Close()
 			if err := <-quit; err != nil {
@@ -225,8 +117,8 @@ func selpgMain() {
 			reportErr(errors.New("usage: invalid standard input!"))
 			return
 		}
-		// process stdin stream
-		if err := processStream(os.Stdin, out); err != nil {
+		// process stdin stream and select page
+		if err := engine.SelectPages(os.Stdin, out, &selpgOpts); err != nil {
 			reportErr(err)
 		}
 		return
@@ -240,7 +132,7 @@ func selpgMain() {
 		reportErr(err)
 		return
 	}
-	if err := processStream(f, out); err != nil {
+	if err := engine.SelectPages(f, out, &selpgOpts); err != nil {
 		reportErr(err)
 		return
 	}
