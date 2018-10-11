@@ -1,8 +1,10 @@
-# `selpg` -- a simple golang CLI program demo
+# `selpg` -- a simple golang CLI program
+
+`selpg` is a command line program to print specific page in the file. You can specify the page format to print specific page. Moreover, selpg allows you to print the specific page to system printer.
 
 > This is my first golang CLI program. So it will be a simple demo for me to learn how to construct CLI program under CLI.
 
-## Install
+## Installation
 
 [Go installation](https://golang.org/doc/install) required!
 
