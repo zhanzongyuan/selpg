@@ -24,11 +24,6 @@ var (
 	destination   = flag.StringP("destination", "d", "", "Printer destination to print choesn page.")
 )
 
-var (
-	pageendFlag = byte('\n')
-	limitFlag   = 72
-)
-
 // system variable
 var (
 	exitCode = 0
