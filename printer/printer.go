@@ -1,4 +1,4 @@
-package main
+package printer
 
 import (
 	"io"
@@ -7,7 +7,7 @@ import (
 )
 
 // printer goroutine
-func runPrinter(destination *string, reader io.Reader, quit chan error) {
+func RunPrinter(destination *string, reader io.Reader, quit chan error) {
 	cmd := exec.Command("lp", "-d", *destination)
 	cmd.Stdin = reader
 
