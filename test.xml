@@ -1,0 +1,12 @@
+<items>
+    <item>
+        <command>add</command>
+        <url>https://quanjing.com/SearchImage.aspx?q=20200529090926919.jpg</url>
+        <caption labelposition="top-right" fontcolor="#CC33CC" labelx="10" labely="20" shadow="no" fontname="arial" italic="yes" fontsize="40">New Title</caption>
+        <imagesize position="random">stretch</imagesize>
+    </item>
+    <item>
+        <command>add</command>
+        <url>https://quanjing.com/SearchImage.aspx?q=20200529090950961.jpg</url>
+    </item>
+</items>
